@@ -198,7 +198,7 @@ class Orchestrator:
         issues = []
         
         # Look for common issue patterns
-        review_text = result.final_answer.lower()
+        review_text = result.answer.lower()
         
         if "issue" in review_text or "problem" in review_text or "fix" in review_text:
             # Found some issues (simplified extraction)

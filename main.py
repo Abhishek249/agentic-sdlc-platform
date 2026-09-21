@@ -150,9 +150,13 @@ async def run_review_and_fix_workflow(request: ReviewAndFixRequest):
         logger.info("review_and_fix_workflow_requested", repo=request.repo_path)
         
         tools = [
-            GitDiffTool(), GitLogTool(), GitShowTool(),
-            ReadFileTool(), WriteFileTool(),
-            RunLinterTool(), RunTypeCheckerTool()
+            GitDiffTool(repo_root=request.repo_path),
+            GitLogTool(repo_root=request.repo_path),
+            GitShowTool(repo_root=request.repo_path),
+            ReadFileTool(workspace_root=request.repo_path),
+            WriteFileTool(workspace_root=request.repo_path),
+            RunLinterTool(),
+            RunTypeCheckerTool()
         ]
         
         reviewer = PRReviewerAgent(name="PR Reviewer", tools=tools, model=os.getenv("AGENT_MODEL", "gpt-4o"), max_steps=10)
