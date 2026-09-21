@@ -20,7 +20,7 @@ async def trigger_review(repo_path: str, branch: str, agent_num: int):
     async with httpx.AsyncClient(timeout=120.0) as client:
         try:
             response = await client.post(
-                "http://localhost:8000/agent/review",
+                "http://localhost:8888/agent/review",
                 json={
                     "repo_path": repo_path,
                     "target_branch": "main",
@@ -50,7 +50,7 @@ async def main():
 This demo will:
 1. Launch multiple agents in parallel
 2. Each agent will review different repos
-3. Open http://localhost:8000 in your browser to watch!
+3. Open http://localhost:8888 in your browser to watch!
 
 Press Enter when you have the dashboard open...
 """)
@@ -68,7 +68,7 @@ Press Enter when you have the dashboard open...
     # Check if server is running
     try:
         async with httpx.AsyncClient() as client:
-            health = await client.get("http://localhost:8000/health")
+            health = await client.get("http://localhost:8888/health")
             if health.status_code != 200:
                 print("❌ Server is not running! Start it with: python3 main.py")
                 return

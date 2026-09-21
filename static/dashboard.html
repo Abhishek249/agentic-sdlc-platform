@@ -330,7 +330,7 @@
         };
 
         function connect() {
-            ws = new WebSocket('ws://localhost:8000/ws/dashboard');
+            ws = new WebSocket('ws://localhost:8888/ws/dashboard');
             
             ws.onopen = () => {
                 console.log('Connected to agent system');
