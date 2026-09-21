@@ -1,6 +1,29 @@
 # Agentic SDLC System
 
-Multi-agent orchestration system for automating software development lifecycle.
+🚀 **Multi-agent orchestration system with real-time control room dashboard**
+
+Watch your AI agents think, act, and collaborate — like SpaceX Mission Control for software development!
+
+## ✨ Features
+
+- 🤖 **Async Multi-Agent System** — Non-blocking ReAct reasoning loop
+- 📊 **Real-Time Dashboard** — WebSocket-powered control room
+- 🔧 **Extensible Tools** — Git, file operations, linting, type checking
+- 🎯 **Production-Ready** — FastAPI + structured logging + observability
+
+## 🎮 Control Room Dashboard
+
+Open `http://localhost:8000` and watch your agents work in real-time!
+
+![Control Room Features](https://img.shields.io/badge/WebSocket-Live-brightgreen)
+
+**See it in action:**
+- Agent flow: Think → Act → Observe (with animations!)
+- Live trace log with every step
+- Metrics: active agents, success rate, duration
+- Beautiful dark theme inspired by SpaceX Mission Control
+
+📖 **[Full Control Room Guide →](CONTROL_ROOM.md)**
 
 ## Quick Start
 
