@@ -3,13 +3,16 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import structlog
+import json
+from typing import List
 
-from agents import PRReviewerAgent
+from agents import PRReviewerAgent, ObservableAgent
 from tools import (
     ReadFileTool,
     ListFilesTool,
@@ -30,6 +33,34 @@ structlog.configure(
 )
 
 logger = structlog.get_logger()
+
+
+# WebSocket connection manager
+class ConnectionManager:
+    """Manages WebSocket connections for real-time dashboard updates."""
+    
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info("dashboard_connected", total_connections=len(self.active_connections))
+    
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        logger.info("dashboard_disconnected", total_connections=len(self.active_connections))
+    
+    async def broadcast(self, message: dict):
+        """Broadcast message to all connected dashboards."""
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error("broadcast_failed", error=str(e))
+
+
+manager = ConnectionManager()
 
 
 # Request/Response models
@@ -78,6 +109,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Mount static files for dashboard
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/")
+async def root():
+    """Serve the control room dashboard."""
+    return FileResponse("static/dashboard.html")
+
 
 @app.get("/health")
 async def health_check():
@@ -116,15 +156,18 @@ async def review_code(request: ReviewRequest):
         
         # Create agent
         agent = PRReviewerAgent(
-            name=f"reviewer-{request.repo_path}",
+            name=f"PR Reviewer #{request.repo_path}",
             tools=tools,
             model=os.getenv("AGENT_MODEL", "gpt-4o"),
             max_steps=int(os.getenv("AGENT_MAX_STEPS", "10"))
         )
         
-        # Execute agent (ASYNC! Non-blocking!)
+        # Wrap with observable for real-time updates
+        observable = ObservableAgent(agent, broadcast_fn=manager.broadcast)
+        
+        # Execute agent (ASYNC! Non-blocking! With live updates!)
         task = f"Review the code changes in {request.repo_path} compared to {request.target_branch}"
-        result = await agent.execute(task)
+        result = await observable.execute(task)
         
         if not result.success:
             logger.error("review_failed", error=result.error)
@@ -167,6 +210,24 @@ async def list_agents():
             }
         ]
     }
+
+
+@app.websocket("/ws/dashboard")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time dashboard updates.
+    
+    Sends agent execution updates to connected dashboards.
+    """
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive
+            data = await websocket.receive_text()
+            # Echo back for ping/pong
+            await websocket.send_text(data)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 
 if __name__ == "__main__":
