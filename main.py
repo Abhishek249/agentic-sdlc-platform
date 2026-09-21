@@ -13,12 +13,18 @@ import json
 from typing import List
 
 from agents import PRReviewerAgent, ObservableAgent
+from agents.fixer import FixerAgent
+from orchestration import Orchestrator
+from messaging import message_bus
 from tools import (
     ReadFileTool,
     ListFilesTool,
     GitDiffTool,
     GitLogTool,
+    GitShowTool,
+    WriteFileTool,
     RunLinterTool,
+    RunTypeCheckerTool,
 )
 
 # Load environment variables
@@ -76,6 +82,14 @@ class ReviewRequest(BaseModel):
     )
 
 
+class ReviewAndFixRequest(BaseModel):
+    """Request to run review + fix workflow."""
+    repo_path: str = Field(..., description="Path to repository")
+    target_branch: str = Field(default="main", description="Target branch to compare against")
+    current_branch: str = Field(default="HEAD", description="Current branch to review")
+    auto_fix: bool = Field(default=True, description="Automatically apply fixes")
+
+
 class ReviewResponse(BaseModel):
     """Response from code review."""
     success: bool
@@ -123,6 +137,44 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "agentic-sdlc"}
+
+
+@app.post("/agent/review-and-fix")
+async def run_review_and_fix_workflow(request: ReviewAndFixRequest):
+    """
+    Run the full Review → Fix workflow with two agents!
+    
+    Multi-agent communication demo - watch in dashboard!
+    """
+    try:
+        logger.info("review_and_fix_workflow_requested", repo=request.repo_path)
+        
+        tools = [
+            GitDiffTool(), GitLogTool(), GitShowTool(),
+            ReadFileTool(), WriteFileTool(),
+            RunLinterTool(), RunTypeCheckerTool()
+        ]
+        
+        reviewer = PRReviewerAgent(name="PR Reviewer", tools=tools, model=os.getenv("AGENT_MODEL", "gpt-4o"), max_steps=10)
+        observable_reviewer = ObservableAgent(reviewer, broadcast_fn=manager.broadcast)
+        
+        fixer = FixerAgent(agent_id="fixer", tools=tools, model=os.getenv("AGENT_MODEL", "gpt-4o"), max_steps=10)
+        observable_fixer = ObservableAgent(fixer, broadcast_fn=manager.broadcast)
+        
+        orchestrator = Orchestrator(broadcast_fn=manager.broadcast)
+        
+        result = await orchestrator.run_review_and_fix_workflow(
+            reviewer_agent=observable_reviewer,
+            fixer_agent=observable_fixer,
+            repo_path=request.repo_path,
+            target_branch=request.target_branch,
+            auto_fix=request.auto_fix
+        )
+        
+        return JSONResponse(content=result)
+    except Exception as e:
+        logger.error("review_and_fix_workflow_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/agent/review", response_model=ReviewResponse)

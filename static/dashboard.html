@@ -202,6 +202,67 @@
             overflow-y: auto;
         }
 
+        .message-flow {
+            background: #1a1f3a;
+            border: 2px solid #2a3f5f;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 200px;
+        }
+
+        .message-flow h2 {
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .message-arrow {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            animation: slideIn 0.5s ease;
+        }
+
+        .message-arrow .from-agent {
+            flex: 1;
+            text-align: right;
+            color: #2196F3;
+            font-weight: bold;
+        }
+
+        .message-arrow .arrow {
+            margin: 0 20px;
+            font-size: 24px;
+            color: #4CAF50;
+            animation: pulse 1s infinite;
+        }
+
+        .message-arrow .to-agent {
+            flex: 1;
+            text-align: left;
+            color: #FF9800;
+            font-weight: bold;
+        }
+
+        .message-arrow .message-content {
+            flex: 2;
+            text-align: center;
+            color: #a0a0a0;
+            font-size: 14px;
+        }
+
+        .live-trace {
+            background: #1a1f3a;
+            border: 2px solid #2a3f5f;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
         .live-trace h2 {
             margin-bottom: 15px;
             color: #fff;
@@ -308,6 +369,14 @@
         <!-- Agents will be added dynamically -->
     </div>
 
+    <!-- Agent Communication Flow -->
+    <div class="message-flow">
+        <h2>🔄 Agent Communication Flow</h2>
+        <div id="messageFlow">
+            <!-- Messages between agents will appear here -->
+        </div>
+    </div>
+
     <!-- Live Trace -->
     <div class="live-trace">
         <h2>📊 Live Execution Trace</h2>
@@ -367,6 +436,24 @@
 
         function handleAgentUpdate(data) {
             const { event, agent_id, agent_name, step, total_steps, phase, tool, observation, status, error } = data;
+
+            // Handle agent messages
+            if (event === 'agent_message') {
+                addMessageFlow(data.from_agent, data.to_agent, data.message_type, data.issues_count);
+                addTraceEntry('System', `📨 ${data.from_agent} → ${data.to_agent}: ${data.message_type}`);
+                return;
+            }
+
+            // Handle workflow events
+            if (event === 'workflow_started') {
+                addTraceEntry('Orchestrator', `🎬 Started workflow: ${data.workflow}`);
+                return;
+            }
+
+            if (event === 'workflow_completed') {
+                addTraceEntry('Orchestrator', `✅ Workflow completed: ${data.steps_completed} steps`);
+                return;
+            }
 
             // Update agent card
             if (event === 'agent_started') {
@@ -525,6 +612,47 @@
             // Keep only last 50 entries
             while (traceLog.children.length > 50) {
                 traceLog.removeChild(traceLog.lastChild);
+            }
+        }
+
+        function updateMetrics() {
+            document.getElementById('activeAgents').textContent = stats.activeAgents;
+            document.getElementById('totalExecutions').textContent = stats.totalExecutions;
+            
+            const successRate = stats.totalExecutions > 0 
+                ? Math.round((stats.successfulExecutions / stats.totalExecutions) * 100)
+                : 0;
+            document.getElementById('successRate').textContent = successRate + '%';
+            
+            const avgDuration = stats.totalExecutions > 0
+                ? Math.round(stats.totalDuration / stats.totalExecutions)
+                : 0;
+            document.getElementById('avgDuration').textContent = avgDuration + 's';
+        }
+
+        function addMessageFlow(fromAgent, toAgent, messageType, issuesCount) {
+            const flowContainer = document.getElementById('messageFlow');
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-arrow';
+            
+            const content = messageType === 'fix_request' 
+                ? `${issuesCount || 0} issues to fix`
+                : messageType;
+            
+            messageDiv.innerHTML = `
+                <div class="from-agent">${fromAgent}</div>
+                <div class="arrow">→</div>
+                <div class="message-content">${content}</div>
+                <div class="arrow">→</div>
+                <div class="to-agent">${toAgent}</div>
+            `;
+            
+            flowContainer.insertBefore(messageDiv, flowContainer.firstChild);
+            
+            // Keep only last 10 messages
+            while (flowContainer.children.length > 10) {
+                flowContainer.removeChild(flowContainer.lastChild);
             }
         }
 
