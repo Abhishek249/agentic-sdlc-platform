@@ -27,8 +27,10 @@ class FixerAgent(BaseAgent):
     4. Fixer sends "fix_complete" message back
     """
     
-    def __init__(self, agent_id: str, tools: list, **kwargs):
-        system_prompt = """You are a Code Fixer Agent.
+    @property
+    def system_prompt(self) -> str:
+        """System prompt for the Fixer Agent."""
+        return """You are a Code Fixer Agent.
 
 Your job is to automatically fix code issues reported by the Reviewer Agent.
 
@@ -74,11 +76,11 @@ Or when done:
     }
 }
 """
-        
+    
+    def __init__(self, agent_id: str, tools: list, **kwargs):
         super().__init__(
             name=f"Fixer Agent ({agent_id})",
             tools=tools,
-            system_prompt=system_prompt,
             **kwargs
         )
         
